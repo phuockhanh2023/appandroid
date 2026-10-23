@@ -12,6 +12,9 @@
   .bar input { flex: 1; min-width: 0; padding: 9px; border-radius: 8px; border: 0; font-size: 15px; }
   .bar select, .bar button { padding: 9px 10px; border-radius: 8px; border: 0; font-size: 15px; }
   .bar button { background: #ffd54f; font-weight: 700; }
+  .bar.sbar { padding-bottom: 0; }
+  .bar.sbar + .bar { padding-top: 6px; }
+  .bar.sbar button { background: #e53935; color: #fff; }
   #stage { flex: 1 1 auto; min-height: 0; background: #000; overflow-y: auto; display: flex; flex-direction: column; }
   #pwrap { position: relative; width: min(100%, calc(var(--vh) * 1vh * 16 / 9)); aspect-ratio: 16/9; margin: 0 auto; }
   #pwrap iframe, #pwrap div { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -37,6 +40,23 @@
   .ctl { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); background: #1c1c1c; }
   .ctl button { flex: 0 0 auto; white-space: nowrap; background: #333; color: #fff; border: 0; border-radius: 8px; padding: 8px 11px; font-size: 14px; }
   .ctl button.on { background: #ffd54f; color: #000; }
+  .ctlhead { flex: 0 0 auto; display: flex; justify-content: center; padding: 4px 8px 0; background: #1c1c1c; }
+  .ctlhead button { background: #333; color: #fff; border: 0; border-radius: 8px; padding: 5px 16px; font-size: 13px; }
+  body.nomenu .ctl { display: none; }
+  body.nomenu .ctlhead { padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
+  #res { position: fixed; top: 0; right: 0; bottom: 0; width: min(340px, 100%); z-index: 15; background: #161616; border-left: 1px solid #333; display: none; flex-direction: column; padding-top: env(safe-area-inset-top); }
+  body.showres #res { display: flex; }
+  @media (min-width: 701px) { body.showres { padding-right: 340px; } }
+  #res .rh { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; background: #1c1c1c; font-weight: 700; }
+  #res .rh button { background: #333; color: #fff; border: 0; border-radius: 8px; padding: 6px 11px; font-size: 14px; }
+  #rlist { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 8px calc(12px + env(safe-area-inset-bottom)); }
+  #rlist .rm { padding: 12px 6px; color: #bbb; }
+  #rlist .rm a { color: #ffd54f; }
+  .vi { display: flex; gap: 8px; padding: 6px; border-radius: 8px; cursor: pointer; }
+  .vi:active, .vi:hover { background: #262626; }
+  .vi img { flex: 0 0 auto; width: 128px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; }
+  .vi .t { font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .vi .m { font-size: 12px; color: #999; margin-top: 3px; }
   body.nolist #list { display: none; }
   #list { flex: 0 1 32vh; min-height: 0; overflow-y: auto; padding: 6px 8px 40px; }
   .cue { padding: 8px 10px; border-bottom: 1px solid #262626; cursor: pointer; }
@@ -55,6 +75,10 @@
 </style>
 </head>
 <body>
+<div class="bar sbar">
+  <input id="q" type="search" placeholder="Tìm video YouTube..." enterkeyhint="search">
+  <button id="sgo">🔍 Tìm</button>
+</div>
 <div class="bar">
   <input id="url" type="url" placeholder="Dán link YouTube..." inputmode="url">
   <select id="lang">
@@ -69,6 +93,7 @@
   <div id="sub"><div id="vocab"></div><div id="orig"></div><div id="vi"></div></div>
 </div>
 <div id="list"></div>
+<div class="ctlhead"><button id="btgl">🔽 Ẩn menu</button></div>
 <div class="ctl">
   <button id="vminus">🎬 Nhỏ hơn</button>
   <button id="vplus">🎬 Lớn hơn</button>
@@ -83,6 +108,10 @@
   <button id="bpause" class="on">Chạm từ = dừng</button>
   <button id="minus">A−</button><button id="plus">A+</button>
 </div>
+<div id="res">
+  <div class="rh"><span id="rtitle">Kết quả tìm kiếm</span><button id="rclose">✕ Đóng</button></div>
+  <div id="rlist"></div>
+</div>
 <div id="tip"></div>
 
 <script src="pinyin-pro.js"></script>
@@ -92,7 +121,7 @@
 <script src="api.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
-const SAVE = Object.assign({ lang: "zh", pin: true, vi: true, vocab: true, list: true, size: 26, vh: 36, pause: true }, JSON.parse(localStorage.getItem("cnc") || "{}"));
+const SAVE = Object.assign({ lang: "zh", pin: true, vi: true, vocab: true, list: true, size: 26, vh: 36, pause: true, menu: true }, JSON.parse(localStorage.getItem("cnc") || "{}"));
 const save = () => localStorage.setItem("cnc", JSON.stringify(SAVE));
 const HAN = /[\u4e00-\u9fff]/;
 const RE = { zh: HAN, en: /[A-Za-z]/, ko: /[\uac00-\ud7af]/, ja: /[\u3040-\u30ff\u4e00-\u9fff]/ };
@@ -307,7 +336,13 @@ const size = (d) => { SAVE.size = Math.min(48, Math.max(16, SAVE.size + d)); doc
 const vsize = (d) => { SAVE.vh = Math.min(60, Math.max(12, SAVE.vh + d)); document.documentElement.style.setProperty("--vh", SAVE.vh); save(); };
 $("#vminus").onclick = () => vsize(-4); $("#vplus").onclick = () => vsize(4);
 $("#minus").onclick = () => size(-2); $("#plus").onclick = () => size(2);
+function applyMenu() {
+  document.body.classList.toggle("nomenu", !SAVE.menu);
+  $("#btgl").textContent = SAVE.menu ? "🔽 Ẩn menu" : "🔼 Hiện menu";
+}
+$("#btgl").onclick = () => { SAVE.menu = !SAVE.menu; applyMenu(); save(); };
 function applyPrefs() {
+  applyMenu();
   document.documentElement.style.setProperty("--size", SAVE.size + "px");
   document.documentElement.style.setProperty("--vh", SAVE.vh);
   document.body.classList.toggle("nopin", !SAVE.pin); document.body.classList.toggle("novi", !SAVE.vi); document.body.classList.toggle("novocab", !SAVE.vocab); document.body.classList.toggle("nolist", !SAVE.list);
@@ -333,6 +368,57 @@ $("#go").onclick = async () => {
     clearInterval(timer); timer = setInterval(tick, 200);
   } catch (e) { msg("Không kết nối được server phụ đề"); }
 };
+/* ---------- Tìm video YouTube -> danh sách bên phải ---------- */
+const PIPED = ["https://pipedapi.kavin.rocks", "https://pipedapi.adminforge.de", "https://api.piped.private.coffee"];
+const INVID = ["https://yewtu.be", "https://inv.nadeko.net", "https://invidious.nerdvpn.de"];
+const fmtDur = (s) => { s = Math.max(0, Math.floor(+s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0"); return h ? h + ":" + String(m).padStart(2, "0") + ":" + x : m + ":" + x; };
+async function jget(url, ms = 7000) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); } finally { clearTimeout(t); }
+}
+async function searchVideos(q) {
+  // 1) server của bạn: GET /api/search?q=...&lang=...  ->  { items: [{id,title,channel,duration}] }
+  try { const r = await jget("/api/search?q=" + encodeURIComponent(q) + "&lang=" + lang); if (r && Array.isArray(r.items)) return r.items; } catch (e) {}
+  // 2) dự phòng: các máy chủ Piped / Invidious công cộng
+  for (const h of PIPED) {
+    try {
+      const r = await jget(h + "/search?q=" + encodeURIComponent(q) + "&filter=videos");
+      const items = (r.items || []).filter((x) => x.url && x.url.includes("v=")).map((x) => ({ id: x.url.split("v=")[1].split("&")[0], title: x.title, channel: x.uploaderName, duration: x.duration }));
+      if (items.length) return items;
+    } catch (e) {}
+  }
+  for (const h of INVID) {
+    try {
+      const r = await jget(h + "/api/v1/search?type=video&q=" + encodeURIComponent(q));
+      const items = (r || []).filter((x) => x.videoId).map((x) => ({ id: x.videoId, title: x.title, channel: x.author, duration: x.lengthSeconds }));
+      if (items.length) return items;
+    } catch (e) {}
+  }
+  return null;
+}
+function showRes(on) { document.body.classList.toggle("showres", on); }
+async function searchYT() {
+  const q = $("#q").value.trim(); if (!q) { $("#q").focus(); return; }
+  showRes(true); $("#rtitle").textContent = "Kết quả: " + q;
+  const box = $("#rlist"); box.innerHTML = '<div class="rm">Đang tìm...</div>';
+  const items = await searchVideos(q);
+  const yt = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q) + "&sp=EgIoAQ%253D%253D";
+  if (!items) { box.innerHTML = '<div class="rm">Không tìm được video (máy chủ tìm kiếm không phản hồi).<br><a href="' + yt + '" target="_blank" rel="noopener">Mở kết quả trên YouTube ↗</a></div>'; return; }
+  if (!items.length) { box.innerHTML = '<div class="rm">Không có kết quả.</div>'; return; }
+  box.innerHTML = items.map((x) => '<div class="vi" data-id="' + esc(x.id) + '"><img loading="lazy" src="https://i.ytimg.com/vi/' + esc(x.id) + '/mqdefault.jpg" alt=""><div><div class="t">' + esc(x.title || "") +
+    '</div><div class="m">' + esc(x.channel || "") + (x.duration > 0 ? " · " + fmtDur(x.duration) : "") + "</div></div></div>").join("") +
+    '<div class="rm"><a href="' + yt + '" target="_blank" rel="noopener">Xem thêm trên YouTube ↗</a></div>';
+  box.scrollTop = 0;
+}
+$("#rlist").addEventListener("click", (e) => {
+  const el = e.target.closest(".vi"); if (!el) return;
+  $("#url").value = "https://www.youtube.com/watch?v=" + el.dataset.id;
+  if (matchMedia("(max-width: 700px)").matches) showRes(false);
+  $("#go").click();
+});
+$("#rclose").onclick = () => showRes(false);
+$("#sgo").onclick = searchYT;
+$("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") searchYT(); });
 $("#url").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#go").click(); });
 applyPrefs();
 </script>
