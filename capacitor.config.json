@@ -1,0 +1,7 @@
+{
+  "appId": "com.example.hocngoaingu",
+  "appName": "Học ngoại ngữ",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}
